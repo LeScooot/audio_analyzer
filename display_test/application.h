@@ -1,0 +1,7 @@
+#ifndef APPLICATION_H_
+#define APPLICATION_H_
+
+typedef enum{SAMPLING, CALCULATING, DISPLAY_WAVEFORM, DISPLAY_SPECTRUM} ApplicationState;
+
+
+#endif /* APPLICATION_H_ */

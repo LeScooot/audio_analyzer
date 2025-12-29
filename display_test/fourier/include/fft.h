@@ -1,0 +1,28 @@
+#ifndef FFT_H
+#define FFT_H
+
+#include "pico/stdlib.h"
+#include "kiss_fftr.h"
+#include "hardware/adc.h"
+#include "hardware/dma.h"
+
+#include <stdio.h>
+#include <math.h>
+
+#define CLOCK_DIV 1088
+#define FSAMP 44100
+#define CAPTURE_CHANNEL 0
+#define NSAMP 1000
+
+typedef struct {
+    const char *name;
+    int freq_min;
+    int freq_max;
+    float amplitude;
+} frequency_bin_t;
+
+void fft_setup();
+void fft_sample(uint8_t *capture_buf);
+void fft_process(uint8_t *capture_buf, frequency_bin_t *bins, int bin_count);
+
+#endif /* FFT_H */
