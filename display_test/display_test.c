@@ -10,7 +10,17 @@
 #include <math.h>
 // #include "fourier/include/fft.h"
 
+
 // SAMPLING RATE : 40000 Hz
+
+/**
+ * TODO:
+ * Debug amplitude
+ * Windowing
+ * Button for switching from TD->FD
+ * Button for changing resolution/zoom
+ * 
+ * */
 
 #define SDA 12
 #define SCL 13
