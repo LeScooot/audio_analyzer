@@ -7,6 +7,7 @@
 #include "application.h"
 #include "hardware/dma.h"
 #include "fourier/include/kiss_fftr.h"
+#include <math.h>
 // #include "fourier/include/fft.h"
 
 // SAMPLING RATE : 40000 Hz
@@ -18,7 +19,7 @@
 #define R_IN 26
 
 #define SAMPLE_SIZE 256
-#define CLOCK_DIV 1200
+#define CLOCK_DIV 4800
 
 #define BIN_COUNT 10
 
@@ -29,7 +30,7 @@ void init_project(ssd1306_t *disp);
 void convert_adc_to_voltage(double *returner, uint16_t *buffer);
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer);
 void sampleADC(uint16_t *capture_buf);
-void compute_fft(uint16_t *capture_buffer, kiss_fft_cpx *output_buffer);
+void compute_fft(kiss_fftr_cfg *kiss_config, uint16_t *capture_buffer, kiss_fft_cpx *output_buffer);
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output);
 
 static uint dma_chan;
@@ -54,6 +55,7 @@ int main()
     channel_config_set_dreq(&dma_config, DREQ_ADC);
 
     kiss_fft_cpx fft_output[SAMPLE_SIZE];
+    kiss_fftr_cfg kiss_config = kiss_fftr_alloc(SAMPLE_SIZE, false, NULL, NULL);
 
     /**
      * Main Loop
@@ -63,7 +65,7 @@ int main()
         switch (appState)
         {
         case SAMPLING:
-            printf("SAMPLING\n");
+            // printf("SAMPLING\n");
             // finished = sampleADC(raw_voltages);
             sampleADC(raw_voltages);
             convert_adc_to_voltage(converted_voltages, raw_voltages);
@@ -74,14 +76,14 @@ int main()
             break;
 
         case CALCULATING:
-            printf("COMPUTING\n");
-            compute_fft(raw_voltages, fft_output);
+            // printf("COMPUTING\n");
+            compute_fft(&kiss_config, raw_voltages, fft_output);
             appState = DISPLAY_SPECTRUM;
             break;
 
         case DISPLAY_WAVEFORM:
 
-            printf("DISPLAYING WAVEFORM\n");
+            // printf("DISPLAYING WAVEFORM\n");
             finished = create_waveform(&disp, raw_voltages);
             if (finished)
             {
@@ -94,8 +96,9 @@ int main()
 
         case DISPLAY_SPECTRUM:
 
-            printf("DISPLAYING SPECTRUM");
+            // printf("DISPLAYING SPECTRUM");
             finished = create_spectrum(&disp, fft_output);
+
             if (finished)
             {
                 ssd1306_show(&disp);
@@ -154,7 +157,7 @@ bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
     ssd1306_draw_line(disp, i, 63, i, 930 - raw_buffer[i * 2] / 2);
-    printf("Buffer: %d \n", raw_buffer[i * 2]);
+    // printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
     if (i >= 127)
     {
@@ -167,14 +170,19 @@ bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
     static int i = 0;
-    int magnitude = fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i;
-    ssd1306_draw_line(disp, i, 63, i, 63 - magnitude);
+    float magnitude = sqrtf (fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
+    float magnitude_db = (20 * log10(magnitude));
+    int frequency = 10000.0/SAMPLE_SIZE * i; //1/N needed if looking at frequency domain amplitudes
+    printf("Magnitude for %d: %d\n", frequency, magnitude);
+    printf("Decibels for %d: %d\n", frequency, magnitude_db);
+    ssd1306_draw_line(disp, i, 63 - magnitude_db * 4, i, 63);
     i = i + 1;
     if (i >= 127)
     {
         i = 0;
         return true;
     }
+    return false;
 }
 
 void init_project(ssd1306_t *disp)
@@ -232,7 +240,7 @@ float compute_average(uint16_t *capture_buffer)
     return sum * 1.0 / SAMPLE_SIZE;
 }
 
-void compute_fft(uint16_t *capture_buffer, kiss_fft_cpx *output_buffer)
+void compute_fft(kiss_fftr_cfg *kiss_config, uint16_t *capture_buffer, kiss_fft_cpx *output_buffer)
 {
     float avg = compute_average(capture_buffer);
 
@@ -243,6 +251,5 @@ void compute_fft(uint16_t *capture_buffer, kiss_fft_cpx *output_buffer)
         fft_buffer[i] = (float)(capture_buffer[i] - avg);
     }
 
-    kiss_fftr_cfg cfg = kiss_fftr_alloc(SAMPLE_SIZE, false, NULL, NULL);
-    kiss_fftr(cfg, fft_buffer, output_buffer);
+    kiss_fftr(*kiss_config, fft_buffer, output_buffer);
 }
