@@ -8,18 +8,20 @@
 #include "hardware/dma.h"
 #include "fourier/include/kiss_fftr.h"
 #include <math.h>
+#include <time.h>
 // #include "fourier/include/fft.h"
-
 
 // SAMPLING RATE : 40000 Hz
 
 /**
  * TODO:
  * Debug amplitude
+ * Increase samples to look at lower frequencies
  * Windowing
  * Button for switching from TD->FD
  * Button for changing resolution/zoom
- * 
+ * Create FFT implementation
+ *
  * */
 
 #define SDA 12
@@ -28,8 +30,14 @@
 #define L_IN 27
 #define R_IN 26
 
-#define SAMPLE_SIZE 256
-#define CLOCK_DIV 4800
+#define DOMAIN_SWITCH 28
+#define SCALE_SWITCH 18
+
+#define SAMPLE_SIZE 256 // Look at this
+#define CLOCK_DIV 2400
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 
 #define BIN_COUNT 10
 
@@ -42,9 +50,45 @@ bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer);
 void sampleADC(uint16_t *capture_buf);
 void compute_fft(kiss_fftr_cfg *kiss_config, uint16_t *capture_buffer, kiss_fft_cpx *output_buffer);
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output);
+void compute_max_min(kiss_fft_cpx * fft_output, float *max, float *min);
+void init_buttons();
 
 static uint dma_chan;
 static dma_channel_config dma_config;
+
+static absolute_time_t curr_time_domain;
+static absolute_time_t prev_time_domain = 0;
+
+static absolute_time_t curr_time_scale;
+static absolute_time_t prev_time_scale = 0;
+
+static DomainState domain_state = FREQUENCY;
+static int scale_factor = 1;
+
+static int sample_size = 128;
+
+void domain_switch_callback(uint gpio, uint32_t events)
+{
+    uint64_t curr_time_domain = time_us_64();
+    if (curr_time_domain - prev_time_domain > 200000)
+    {
+        domain_state = (domain_state + 1) % 2;
+        printf("Domain Toggled\n");
+        // printf("Domain: %d\n", domain_state);
+        prev_time_domain = curr_time_domain;
+    }
+}
+
+void scale_switch_callback(uint gpio, uint32_t events){
+    uint64_t curr_time_scale = time_us_64();
+    if (curr_time_scale - prev_time_scale > 200000)
+    {
+        scale_factor = (scale_factor * 2) % 7;
+        
+        prev_time_scale = curr_time_scale;
+    }
+
+}
 
 int main()
 {
@@ -67,6 +111,8 @@ int main()
     kiss_fft_cpx fft_output[SAMPLE_SIZE];
     kiss_fftr_cfg kiss_config = kiss_fftr_alloc(SAMPLE_SIZE, false, NULL, NULL);
 
+    float max, min;
+
     /**
      * Main Loop
      */
@@ -75,25 +121,28 @@ int main()
         switch (appState)
         {
         case SAMPLING:
-            // printf("SAMPLING\n");
+            // // printf("SAMPLING\n");
             // finished = sampleADC(raw_voltages);
             sampleADC(raw_voltages);
             convert_adc_to_voltage(converted_voltages, raw_voltages);
-            appState = CALCULATING;
+            if (domain_state == FREQUENCY)
+                appState = CALCULATING;
+            else
+                appState = DISPLAY_WAVEFORM;
             finished = false;
             ssd1306_clear(&disp);
             gpio_put(PICO_DEFAULT_LED_PIN, false);
             break;
 
         case CALCULATING:
-            // printf("COMPUTING\n");
+            // // printf("COMPUTING\n");
             compute_fft(&kiss_config, raw_voltages, fft_output);
             appState = DISPLAY_SPECTRUM;
             break;
 
         case DISPLAY_WAVEFORM:
 
-            // printf("DISPLAYING WAVEFORM\n");
+            // // printf("DISPLAYING WAVEFORM\n");
             finished = create_waveform(&disp, raw_voltages);
             if (finished)
             {
@@ -106,9 +155,8 @@ int main()
 
         case DISPLAY_SPECTRUM:
 
-            // printf("DISPLAYING SPECTRUM");
+            // // printf("DISPLAYING SPECTRUM");
             finished = create_spectrum(&disp, fft_output);
-
             if (finished)
             {
                 ssd1306_show(&disp);
@@ -163,13 +211,15 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
     }
 }
 
+#define DC_OFFSET 930 
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
-    ssd1306_draw_line(disp, i, 63, i, 930 - raw_buffer[i * 2] / 2);
-    // printf("Buffer: %d \n", raw_buffer[i * 2]);
+    ssd1306_draw_line(disp, i, SCREEN_HEIGHT-1, i, DC_OFFSET - raw_buffer[i * 2] / 2);
+
+    // // printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
-    if (i >= 127)
+    if (i >= SCREEN_WIDTH-1)
     {
         i = 0;
         return true;
@@ -177,17 +227,66 @@ bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
     return false;
 }
 
+
+float find_minimum(float mag)
+{
+    static float min_val = -80;
+    if (mag < min_val && mag != -80)
+    {
+        min_val = mag;
+    }
+    return min_val;
+}
+
+float find_maximum(float mag, int i)
+{
+    
+    static float max_val = -80;
+    if (mag > max_val )
+    {
+        max_val = mag;
+    }
+    if(i >= 127){
+        max_val = -80;
+    }
+    return max_val;
+}
+
+// void compute_max_min(kiss_fft_cpx * fft_output, float *max, float *min){
+//     *max = -80;
+//     *min = 0;
+//     for(int i = 0; i < SAMPLE_SIZE/2; i++){
+//         float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
+//         float magnitude_db = (20 * log10(magnitude));
+
+//         if(magnitude_db > *max){
+//             *max = magnitude_db;
+//         }
+//         if(magnitude_db < *min){
+//             *min = magnitude_db;
+//         }
+//     }
+
+// }
+
+// TODO: log10 returns negative infinity for 0 frequenciest
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
     static int i = 0;
-    float magnitude = sqrtf (fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
+    float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
+    if (magnitude == 0)
+    {
+        // printf("ZERO MAGNITUDE\n");
+        magnitude = 0.0001;
+    }
     float magnitude_db = (20 * log10(magnitude));
-    int frequency = 10000.0/SAMPLE_SIZE * i; //1/N needed if looking at frequency domain amplitudes
-    printf("Magnitude for %d: %d\n", frequency, magnitude);
-    printf("Decibels for %d: %d\n", frequency, magnitude_db);
-    ssd1306_draw_line(disp, i, 63 - magnitude_db * 4, i, 63);
+    int frequency = 10000.0 / SAMPLE_SIZE * i; // 1/N needed if looking at frequency domain amplitudes
+    // printf("Magnitude for %d: %0.4f\n", frequency, magnitude);
+    // printf("Decibels for %d: %0.4f\n", frequency, magnitude_db);
+
+    ssd1306_draw_line(disp, i, ((SCREEN_HEIGHT-1) - (magnitude_db + 80) * 2), i, SCREEN_HEIGHT-1);
     i = i + 1;
-    if (i >= 127)
+    if (i >= SCREEN_WIDTH-1)
     {
         i = 0;
         return true;
@@ -215,6 +314,7 @@ void init_project(ssd1306_t *disp)
         false,
         false);
     adc_set_clkdiv(CLOCK_DIV);
+    init_buttons();
 }
 
 void init_display(ssd1306_t *disp)
@@ -258,8 +358,23 @@ void compute_fft(kiss_fftr_cfg *kiss_config, uint16_t *capture_buffer, kiss_fft_
 
     for (int i = 0; i < SAMPLE_SIZE; i++)
     {
-        fft_buffer[i] = (float)(capture_buffer[i] - avg);
+        fft_buffer[i] = (float)(capture_buffer[i] - avg)/2048.0f;
     }
 
     kiss_fftr(*kiss_config, fft_buffer, output_buffer);
+}
+
+void init_buttons()
+{
+    gpio_init(DOMAIN_SWITCH);
+    gpio_set_dir(DOMAIN_SWITCH, GPIO_IN);
+    gpio_pull_up(DOMAIN_SWITCH);
+
+    // gpio_init(SCALE_SWITCH);
+    // gpio_set_dir(SCALE_SWITCH, GPIO_IN);
+    // gpio_pull_up(SCALE_SWITCH);
+
+    gpio_set_irq_enabled_with_callback(DOMAIN_SWITCH, GPIO_IRQ_EDGE_FALL, true, &domain_switch_callback);
+    // gpio_set_irq_enabled_with_callback(SCALE_SWITCH, GPIO_IRQ_EDGE_FALL, true, &scale_switch_callback);
+
 }
