@@ -34,7 +34,7 @@
 #define SCALE_SWITCH 18
 
 #define SAMPLE_SIZE 256 // Look at this
-#define CLOCK_DIV 1200
+#define CLOCK_DIV 2400
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -73,6 +73,10 @@ static volatile bool scale_changed = false;
 
 void gpio_callback(uint gpio, uint32_t events)
 {
+    if(curr_time_domain - curr_time_scale > 200000){ //both buttons pressed, return to defaults
+
+
+    }
     switch (gpio)
     {
     case DOMAIN_SWITCH:
@@ -97,7 +101,9 @@ void gpio_callback(uint gpio, uint32_t events)
             }
             prev_time_scale = curr_time_scale;
         }
+        break;
     }
+ //both buttons pressed
 }
 
 int main()
@@ -161,6 +167,9 @@ int main()
             finished = create_waveform(&disp, raw_voltages);
             if (finished)
             {
+                char str[10];
+                sprintf(str, "x%d", scale_factor);
+                ssd1306_draw_string(&disp, 115, 0, 1, str);
                 ssd1306_show(&disp);
                 appState = SAMPLING;
                 finished = false;
@@ -174,6 +183,9 @@ int main()
             finished = create_spectrum(&disp, fft_output);
             if (finished)
             {
+                char str[10];
+                sprintf(str, "x%d", scale_factor);
+                ssd1306_draw_string(&disp, 115, 0, 1, str);
                 ssd1306_show(&disp);
                 appState = SAMPLING;
                 finished = false;
@@ -255,6 +267,7 @@ float find_maximum(float mag, int i)
 
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
+
     static int i = 0;
     float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / (SAMPLE_SIZE * scale_factor) * 1.0;
     if (magnitude == 0)
@@ -274,6 +287,7 @@ bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
         return true;
     }
     return false;
+    
 }
 
 void init_project(ssd1306_t *disp)
