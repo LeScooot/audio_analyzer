@@ -224,11 +224,11 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
     }
 }
 
-#define DC_OFFSET 930
+#define DC_OFFSET 920
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
-    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, DC_OFFSET - raw_buffer[i * scale_factor] / 2);
+    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2)*1.5);
 
     // // printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
