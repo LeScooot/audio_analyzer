@@ -38,7 +38,7 @@
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define MAX_SCALE_FACTOR 8
+#define MAX_SCALE_FACTOR 4
 
 #define BIN_COUNT 10
 
