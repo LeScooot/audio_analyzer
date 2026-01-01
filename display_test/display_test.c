@@ -15,11 +15,7 @@
 
 /**
  * TODO:
- * Debug amplitude
- * Increase samples to look at lower frequencies
  * Windowing
- * Button for switching from TD->FD
- * Button for changing resolution/zoom
  * Create FFT implementation
  *
  * */
@@ -279,7 +275,7 @@ bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
     // printf("Magnitude for %d: %0.4f\n", frequency, magnitude);
     // printf("Decibels for %d: %0.4f\n", frequency, magnitude_db);
 
-    ssd1306_draw_line(disp, i, ((SCREEN_HEIGHT - 1) - (magnitude_db + 80) * 2), i, SCREEN_HEIGHT - 1);
+    ssd1306_draw_line(disp, i, ((SCREEN_HEIGHT - 1) - (magnitude_db + 75) * 2), i, SCREEN_HEIGHT - 1);
     i = i + 1;
     if (i >= SCREEN_WIDTH - 1)
     {
