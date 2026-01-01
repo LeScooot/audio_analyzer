@@ -34,6 +34,8 @@
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
+
+
 #define MAX_SCALE_FACTOR 4
 
 #define BIN_COUNT 10
@@ -63,13 +65,16 @@ static absolute_time_t prev_time_scale = 0;
 static volatile DomainState domain_state = FREQUENCY;
 static volatile int scale_factor = 1;
 
+
+
 // static  int sample_size = 128;
 
 static volatile bool scale_changed = false;
 
+#define TIMEOUT 200000
 void gpio_callback(uint gpio, uint32_t events)
 {
-    if(curr_time_domain - curr_time_scale > 200000){ //both buttons pressed, return to defaults
+    if(curr_time_domain - curr_time_scale > TIMEOUT){ //both buttons pressed, return to defaults
 
 
     }
@@ -77,7 +82,7 @@ void gpio_callback(uint gpio, uint32_t events)
     {
     case DOMAIN_SWITCH:
         curr_time_domain = time_us_64();
-        if (curr_time_domain - prev_time_domain > 200000)
+        if (curr_time_domain - prev_time_domain > TIMEOUT)
         {
             domain_state = (domain_state + 1) % 2;
             printf("Domain Toggled\n");
@@ -87,7 +92,7 @@ void gpio_callback(uint gpio, uint32_t events)
         break;
     case SCALE_SWITCH:
         curr_time_scale = time_us_64();
-        if (curr_time_scale - prev_time_scale > 200000)
+        if (curr_time_scale - prev_time_scale > TIMEOUT)
         {
             scale_changed = true;
             scale_factor = scale_factor << 1;
@@ -209,10 +214,13 @@ void sampleADC(uint16_t *capture_buf)
     dma_channel_wait_for_finish_blocking(dma_chan);
 }
 
+#define MIDPOINT_VOLTAGE 1757.55636364
+#define MAX_ADC 4096.0
+#define LOGIC_LEVEL 3.3
 void convert_adc_to_voltage(double *returner, uint16_t *buffer)
 {
     static int i = 0;
-    returner[i] = (buffer[i] - 1757.55636364) * (3.3 / 4096.0);
+    returner[i] = (buffer[i] - MIDPOINT_VOLTAGE) * (LOGIC_LEVEL / MAX_ADC);
     i = i + 1;
     if (i >= SAMPLE_SIZE - 1)
     {
@@ -221,10 +229,11 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
 }
 
 #define DC_OFFSET 920
+#define WAVEFORM_AMPLITUDE_SCALE 1.5
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
-    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2)*1.5);
+    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2)* WAVEFORM_AMPLITUDE_SCALE);
 
     // // printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
@@ -261,6 +270,9 @@ float find_maximum(float mag, int i)
     return max_val;
 }
 
+#define MIN_MAG 0.0001
+#define DB_OFFSET 75
+#define SPECTRUM_LINE_SCALE_FACTOR 2
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
 
@@ -268,14 +280,14 @@ bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
     float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / (SAMPLE_SIZE * scale_factor) * 1.0;
     if (magnitude == 0)
     {
-        magnitude = 0.0001;
+        magnitude = MIN_MAG;
     }
     float magnitude_db = (20 * log10(magnitude));
-    int frequency = 10000.0 / SAMPLE_SIZE * i; // 1/N needed if looking at frequency domain amplitudes
-    // printf("Magnitude for %d: %0.4f\n", frequency, magnitude);
-    // printf("Decibels for %d: %0.4f\n", frequency, magnitude_db);
+    // int frequency = 10000.0 / SAMPLE_SIZE * i; // 1/N needed if looking at frequency domain amplitudes
+    // // printf("Magnitude for %d: %0.4f\n", frequency, magnitude);
+    // // printf("Decibels for %d: %0.4f\n", frequency, magnitude_db);
 
-    ssd1306_draw_line(disp, i, ((SCREEN_HEIGHT - 1) - (magnitude_db + 75) * 2), i, SCREEN_HEIGHT - 1);
+    ssd1306_draw_line(disp, i, ((SCREEN_HEIGHT - 1) - (magnitude_db + DB_OFFSET) * SPECTRUM_LINE_SCALE_FACTOR), i, SCREEN_HEIGHT - 1);
     i = i + 1;
     if (i >= SCREEN_WIDTH - 1)
     {
@@ -312,7 +324,7 @@ void init_project(ssd1306_t *disp)
 void init_display(ssd1306_t *disp)
 {
     disp->external_vcc = false;
-    ssd1306_init(disp, 128, 64, 0x3C, i2c0);
+    ssd1306_init(disp, SCREEN_WIDTH, SCREEN_HEIGHT, 0x3C, i2c0);
     ssd1306_clear(disp);
 }
 
