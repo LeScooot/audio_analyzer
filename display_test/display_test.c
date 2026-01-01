@@ -67,7 +67,7 @@ static int scale_factor = 1;
 
 static int sample_size = 128;
 
-void domain_switch_callback(uint gpio, uint32_t events)
+void gpio_callback(uint gpio, uint32_t events)
 {
     uint64_t curr_time_domain = time_us_64();
     if (curr_time_domain - prev_time_domain > 200000)
@@ -79,16 +79,6 @@ void domain_switch_callback(uint gpio, uint32_t events)
     }
 }
 
-void scale_switch_callback(uint gpio, uint32_t events){
-    uint64_t curr_time_scale = time_us_64();
-    if (curr_time_scale - prev_time_scale > 200000)
-    {
-        scale_factor = (scale_factor * 2) % 7;
-        
-        prev_time_scale = curr_time_scale;
-    }
-
-}
 
 int main()
 {
@@ -172,19 +162,6 @@ int main()
     }
 }
 
-// bool sampleADC(int *buffer)
-// {
-//     static int i = 0;
-//     buffer[i] = adc_read();
-//     sleep_us(50); // 50 us, sampling frequency of 20khz
-//     i = i + 1;
-//     if (i >= SAMPLE_SIZE - 1)
-//     {
-//         i = 0;
-//         return true;
-//     }
-//     return false;
-// }
 
 void sampleADC(uint16_t *capture_buf)
 {
@@ -252,31 +229,12 @@ float find_maximum(float mag, int i)
     return max_val;
 }
 
-// void compute_max_min(kiss_fft_cpx * fft_output, float *max, float *min){
-//     *max = -80;
-//     *min = 0;
-//     for(int i = 0; i < SAMPLE_SIZE/2; i++){
-//         float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
-//         float magnitude_db = (20 * log10(magnitude));
-
-//         if(magnitude_db > *max){
-//             *max = magnitude_db;
-//         }
-//         if(magnitude_db < *min){
-//             *min = magnitude_db;
-//         }
-//     }
-
-// }
-
-// TODO: log10 returns negative infinity for 0 frequenciest
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
     static int i = 0;
     float magnitude = sqrtf(fft_output[i].r * fft_output[i].r + fft_output[i].i * fft_output[i].i) / SAMPLE_SIZE * 1.0;
     if (magnitude == 0)
     {
-        // printf("ZERO MAGNITUDE\n");
         magnitude = 0.0001;
     }
     float magnitude_db = (20 * log10(magnitude));
@@ -370,11 +328,11 @@ void init_buttons()
     gpio_set_dir(DOMAIN_SWITCH, GPIO_IN);
     gpio_pull_up(DOMAIN_SWITCH);
 
-    // gpio_init(SCALE_SWITCH);
-    // gpio_set_dir(SCALE_SWITCH, GPIO_IN);
-    // gpio_pull_up(SCALE_SWITCH);
+    gpio_init(SCALE_SWITCH);
+    gpio_set_dir(SCALE_SWITCH, GPIO_IN);
+    gpio_pull_up(SCALE_SWITCH);
 
-    gpio_set_irq_enabled_with_callback(DOMAIN_SWITCH, GPIO_IRQ_EDGE_FALL, true, &domain_switch_callback);
+    gpio_set_irq_enabled_with_callback(DOMAIN_SWITCH, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
     // gpio_set_irq_enabled_with_callback(SCALE_SWITCH, GPIO_IRQ_EDGE_FALL, true, &scale_switch_callback);
 
 }
