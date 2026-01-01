@@ -1,1 +1,1 @@
-Time and frequency domain audio analyzer, built on RP2350
+Time and frequency domain audio analyzer, built for the RP2350
