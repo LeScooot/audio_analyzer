@@ -29,12 +29,11 @@
 #define DOMAIN_SWITCH 28
 #define SCALE_SWITCH 18
 
-#define SAMPLE_SIZE 256 // Look at this
+#define SAMPLE_SIZE 256
 #define CLOCK_DIV 2400
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-
 
 #define MAX_SCALE_FACTOR 4
 
@@ -52,6 +51,7 @@ bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output);
 void compute_max_min(kiss_fft_cpx *fft_output, float *max, float *min);
 void init_buttons();
 void handle_scale_switch(kiss_fftr_cfg *kiss_config);
+void check_scaling(kiss_fftr_cfg *kiss_config);
 
 static uint dma_chan;
 static dma_channel_config dma_config;
@@ -65,18 +65,16 @@ static absolute_time_t prev_time_scale = 0;
 static volatile DomainState domain_state = FREQUENCY;
 static volatile int scale_factor = 1;
 
-
-
 // static  int sample_size = 128;
 
 static volatile bool scale_changed = false;
 
 #define TIMEOUT 200000
+
 void gpio_callback(uint gpio, uint32_t events)
 {
-    if(curr_time_domain - curr_time_scale > TIMEOUT){ //both buttons pressed, return to defaults
-
-
+    if (curr_time_domain - curr_time_scale > TIMEOUT)
+    { // both buttons pressed, return to defaults
     }
     switch (gpio)
     {
@@ -95,16 +93,16 @@ void gpio_callback(uint gpio, uint32_t events)
         if (curr_time_scale - prev_time_scale > TIMEOUT)
         {
             scale_changed = true;
-            scale_factor = scale_factor << 1;
-            if (scale_factor > MAX_SCALE_FACTOR)
-            {
-                scale_factor = 1;
-            }
+            // scale_factor = scale_factor << 1;
+            // if (scale_factor > MAX_SCALE_FACTOR)
+            // {
+            //     scale_factor = 1;
+            // }
             prev_time_scale = curr_time_scale;
         }
         break;
     }
- //both buttons pressed
+    // both buttons pressed
 }
 
 int main()
@@ -139,6 +137,7 @@ int main()
      */
     while (1)
     {
+        check_scaling(&kiss_config);
         switch (appState)
         {
         case SAMPLING:
@@ -157,7 +156,7 @@ int main()
 
         case CALCULATING:
             printf("COMPUTING\n");
-            handle_scale_switch(&kiss_config);
+            // handle_scale_switch(&kiss_config);
             compute_fft(&kiss_config, raw_voltages, fft_output);
             appState = DISPLAY_SPECTRUM;
             break;
@@ -200,6 +199,21 @@ int main()
     }
 }
 
+void check_scaling(kiss_fftr_cfg *kiss_config)
+{
+    if (scale_changed)
+    {
+        scale_factor = scale_factor << 1;
+        if (scale_factor > MAX_SCALE_FACTOR)
+        {
+            scale_factor = 1;
+        }
+        printf("SWITCH HANDLED");
+        free(*kiss_config);
+        *kiss_config = kiss_fftr_alloc(SAMPLE_SIZE * scale_factor, false, NULL, NULL);
+        scale_changed = false;
+    }
+}
 void sampleADC(uint16_t *capture_buf)
 {
     adc_fifo_drain();
@@ -228,12 +242,12 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
     }
 }
 
-#define DC_OFFSET 920
-#define WAVEFORM_AMPLITUDE_SCALE 1.5
+#define DC_OFFSET 925
+#define WAVEFORM_AMPLITUDE_SCALE 1.25
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
-    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2)* WAVEFORM_AMPLITUDE_SCALE);
+    ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2) * WAVEFORM_AMPLITUDE_SCALE);
 
     // // printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
@@ -295,7 +309,6 @@ bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
         return true;
     }
     return false;
-    
 }
 
 void init_project(ssd1306_t *disp)
@@ -387,13 +400,13 @@ void init_buttons()
     irq_set_enabled(IO_IRQ_BANK0, true);
 }
 
-void handle_scale_switch(kiss_fftr_cfg *kiss_config)
-{
-    if (scale_changed)
-    {
-        printf("SWITCH HANDLED");
-        free(*kiss_config);
-        *kiss_config = kiss_fftr_alloc(SAMPLE_SIZE * scale_factor, false, NULL, NULL);
-        scale_changed = false;
-    }
-}
+// void handle_scale_switch(kiss_fftr_cfg *kiss_config)
+// {
+//     if (scale_changed)
+//     {
+//         printf("SWITCH HANDLED");
+//         free(*kiss_config);
+//         *kiss_config = kiss_fftr_alloc(SAMPLE_SIZE * scale_factor, false, NULL, NULL);
+//         scale_changed = false;
+//     }
+// }
