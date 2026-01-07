@@ -151,7 +151,7 @@ int main()
                 appState = DISPLAY_WAVEFORM;
             finished = false;
             ssd1306_clear(&disp);
-            gpio_put(PICO_DEFAULT_LED_PIN, false);
+            // gpio_put(PICO_DEFAULT_LED_PIN, false);
             break;
 
         case CALCULATING:
@@ -173,7 +173,7 @@ int main()
                 ssd1306_show(&disp);
                 appState = SAMPLING;
                 finished = false;
-                gpio_put(PICO_DEFAULT_LED_PIN, true); // turn LED on for sampling
+                // gpio_put(PICO_DEFAULT_LED_PIN, true); // turn LED on for sampling
             }
             break;
 
@@ -189,7 +189,7 @@ int main()
                 ssd1306_show(&disp);
                 appState = SAMPLING;
                 finished = false;
-                gpio_put(PICO_DEFAULT_LED_PIN, true);
+                // gpio_put(PICO_DEFAULT_LED_PIN, true);
             }
             break;
 
@@ -285,7 +285,7 @@ float find_maximum(float mag, int i)
 }
 
 #define MIN_MAG 0.0001
-#define DB_OFFSET 75
+#define DB_OFFSET 78
 #define SPECTRUM_LINE_SCALE_FACTOR 2
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
@@ -354,7 +354,7 @@ void init_status_led(void)
 {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, true);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
 }
 
 float compute_average(uint16_t *capture_buffer)
