@@ -20,14 +20,14 @@
  *
  * */
 
-#define SDA 12
-#define SCL 13
+#define SDA 20
+#define SCL 21
 
-#define L_IN 27
+#define L_IN 26
 #define R_IN 26
 
-#define DOMAIN_SWITCH 28
-#define SCALE_SWITCH 18
+#define DOMAIN_SWITCH 15
+#define SCALE_SWITCH 13
 
 #define SAMPLE_SIZE 256
 #define CLOCK_DIV 2400
@@ -242,14 +242,14 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
     }
 }
 
-#define DC_OFFSET 925
+#define DC_OFFSET 1052
 #define WAVEFORM_AMPLITUDE_SCALE 1.25
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
     static int i = 0;
     ssd1306_draw_line(disp, i, SCREEN_HEIGHT - 1, i, (DC_OFFSET - raw_buffer[i * scale_factor] / 2) * WAVEFORM_AMPLITUDE_SCALE);
 
-    // // printf("Buffer: %d \n", raw_buffer[i * 2]);
+    printf("Buffer: %d \n", raw_buffer[i * 2]);
     i = i + 1;
     if (i >= SCREEN_WIDTH - 1)
     {
