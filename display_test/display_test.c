@@ -242,7 +242,7 @@ void convert_adc_to_voltage(double *returner, uint16_t *buffer)
     }
 }
 
-#define DC_OFFSET 1052
+#define DC_OFFSET 1050
 #define WAVEFORM_AMPLITUDE_SCALE 1.25
 bool create_waveform(ssd1306_t *disp, uint16_t *raw_buffer)
 {
