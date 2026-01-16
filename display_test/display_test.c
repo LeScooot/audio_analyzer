@@ -316,6 +316,7 @@ void init_project(ssd1306_t *disp)
     init_status_led();
     stdio_init_all();
     setup_gpios();
+    sleep_ms(500);
     init_display(disp);
 
     sleep_ms(100);
