@@ -17,6 +17,7 @@
  * TODO:
  * Windowing
  * Create FFT implementation
+ * anti-aliasing
  *
  * */
 
@@ -214,6 +215,7 @@ void check_scaling(kiss_fftr_cfg *kiss_config)
         scale_changed = false;
     }
 }
+
 void sampleADC(uint16_t *capture_buf)
 {
     adc_fifo_drain();
@@ -285,7 +287,7 @@ float find_maximum(float mag, int i)
 }
 
 #define MIN_MAG 0.0001
-#define DB_OFFSET 78
+#define DB_OFFSET 75
 #define SPECTRUM_LINE_SCALE_FACTOR 2
 bool create_spectrum(ssd1306_t *disp, kiss_fft_cpx *fft_output)
 {
@@ -318,7 +320,6 @@ void init_project(ssd1306_t *disp)
     setup_gpios();
     sleep_ms(500);
     init_display(disp);
-
     sleep_ms(100);
 
     adc_init();
